@@ -10,6 +10,7 @@ flat libs), the build falls back to a normal py3-none-any universal wheel.
 """
 import base64
 import hashlib
+import os
 import sysconfig
 import zipfile
 from pathlib import Path
@@ -26,13 +27,9 @@ _ALL_PLATFORM_SUBDIRS = frozenset((
 ))
 
 
-def _detect_platform_subdir() -> "str | None":
-    """Map sysconfig.get_platform() to our lib subdir name."""
-    try:
-        raw = sysconfig.get_platform()
-    except Exception:
-        return None
-    p = raw.lower().replace("-", "_").replace(".", "_")
+def _detect_platform_subdir(plat_raw: str) -> "str | None":
+    """Map a raw platform string (e.g. from --plat-name or sysconfig) to our lib subdir name."""
+    p = plat_raw.lower().replace("-", "_").replace(".", "_")
     if p == "win_amd64":
         return "windows_x64"
     if p in ("win32", "win_x86"):
@@ -139,13 +136,30 @@ class bdist_wheel_platform(_bdist_wheel):
         lib_dir = Path("sound_lib/lib")
         return any((lib_dir / d).is_dir() for d in _ALL_PLATFORM_SUBDIRS)
 
+    def _get_target_plat(self) -> str:
+        """Return the target platform string, respecting cross-compilation hints.
+
+        Priority order:
+        1. ``--plat-name`` passed explicitly on the command line (e.g. Briefcase
+           passes ``--plat-name android-arm64-v8a`` when targeting Android).
+        2. ``_PYTHON_HOST_PLATFORM`` environment variable, set by cibuildwheel
+           and similar cross-compile environments.
+        3. ``sysconfig.get_platform()`` — the native host platform (fallback).
+        """
+        if getattr(self, "plat_name_supplied", False) and self.plat_name:
+            return self.plat_name
+        host_plat = os.environ.get("_PYTHON_HOST_PLATFORM")
+        if host_plat:
+            return host_plat
+        return sysconfig.get_platform()
+
     def get_tag(self) -> "tuple[str, str, str]":
         python, abi, plat = super().get_tag()
         if self._has_platform_subdirs():
-            # Override the 'any' platform with the actual build platform so
+            # Override the 'any' platform with the actual target platform so
             # pip only installs this wheel on a matching system.
             plat = (
-                sysconfig.get_platform()
+                self._get_target_plat()
                 .lower()
                 .replace("-", "_")
                 .replace(".", "_")
@@ -158,7 +172,7 @@ class bdist_wheel_platform(_bdist_wheel):
         if not self._has_platform_subdirs():
             return  # Universal wheel; nothing to rewrite.
 
-        platform_subdir = _detect_platform_subdir()
+        platform_subdir = _detect_platform_subdir(self._get_target_plat())
         if platform_subdir is None:
             return
 
