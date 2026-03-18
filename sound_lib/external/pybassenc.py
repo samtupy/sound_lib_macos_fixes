@@ -5,11 +5,11 @@ import ctypes
 import os
 import platform
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
-bassenc_module = libloader.load_library('bassenc', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
+_bassenc_lib   = find_library('bassenc')
+bassenc_module = _bassenc_lib.module
+func_type      = _bassenc_lib.func_type
 
 HENCODE = ctypes.c_ulong #encoder handle
 

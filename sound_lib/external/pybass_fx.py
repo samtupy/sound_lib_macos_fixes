@@ -4,11 +4,11 @@ from __future__ import absolute_import
 import ctypes
 import os
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
-bass_fx_module = libloader.load_library('bass_fx', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
+_bass_fx_lib   = find_library('bass_fx')
+bass_fx_module = _bass_fx_lib.module
+func_type      = _bass_fx_lib.func_type
 
 
 #Error codes returned by BASS_ErrorGetCode

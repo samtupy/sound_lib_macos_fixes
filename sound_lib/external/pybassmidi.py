@@ -15,13 +15,12 @@ using SF2 soundfonts to provide the sounds.
 
 import sys, ctypes, platform, os
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
-bassmidi_module = libloader.load_library('bassmidi', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
-#Register the plugin with the Bass plugin system.
-pybass.BASS_PluginLoad(libloader.find_library_path('bassmidi', x86_path=x86_path, x64_path=x64_path), 0)
+_bassmidi_lib   = find_library('bassmidi')
+bassmidi_module = _bassmidi_lib.module
+func_type       = _bassmidi_lib.func_type
+pybass.BASS_PluginLoad(_bassmidi_lib.path, 0)
 
 HSOUNDFONT = ctypes.c_ulong
 

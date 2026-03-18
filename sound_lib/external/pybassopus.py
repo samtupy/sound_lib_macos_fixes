@@ -5,13 +5,12 @@ __author__ = 'Max Kolosov <maxkolosov@inbox.ru>'
 
 import os, sys, ctypes
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
-bassopus_module = libloader.load_library('bassopus', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
-#Register the plugin with the Bass plugin system.
-pybass.BASS_PluginLoad(libloader.find_library_path('bassopus', x86_path=x86_path, x64_path=x64_path), 0)
+_bassopus_lib   = find_library('bassopus')
+bassopus_module = _bassopus_lib.module
+func_type       = _bassopus_lib.func_type
+pybass.BASS_PluginLoad(_bassopus_lib.path, 0)
 
 QWORD = pybass.QWORD
 HSTREAM = pybass.HSTREAM

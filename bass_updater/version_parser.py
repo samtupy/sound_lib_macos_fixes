@@ -30,12 +30,12 @@ class VersionParser:
             versions['bass'] = main_version_match.group(1)
             
         # Parse add-on versions from library name + version patterns
-        for lib_key, (display_name, _, _) in BASS_LIBRARIES.items():
+        for lib_key, lib_def in BASS_LIBRARIES.items():
             if lib_key == 'bass':  # Already handled above
                 continue
-                
+
             # Look for patterns like "BASSOPUS 2.4.3" or "Tags 19"
-            pattern = rf'<b>{re.escape(display_name)}</b>\s*([\d.]+)'
+            pattern = rf'<b>{re.escape(lib_def.display_name)}</b>\s*([\d.]+)'
             match = re.search(pattern, html)
             if match:
                 versions[lib_key] = match.group(1)

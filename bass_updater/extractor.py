@@ -1,103 +1,161 @@
-"""Extract and identify files from Bass library archives."""
+"""Extract and identify library files from Bass archive zips."""
 import os
+import shutil
 import zipfile
 from pathlib import Path
-from typing import Dict, List, Tuple
-import shutil
+from typing import Dict, Optional
 
-from .config import PLATFORMS, TEMP_DIR
+from .config import SO_STEMS, TEMP_DIR, WIN_DLL_STEMS
+
+
+# Maps archive-internal arch directory names -> our platform dir names
+_LINUX_ARCH_MAP: Dict[str, str] = {
+    "x86_64":  "linux_x64",
+    "x86":     "linux_x86",
+    "aarch64": "linux_aarch64",
+    "armhf":   "linux_armhf",
+}
+
+_ANDROID_ARCH_MAP: Dict[str, str] = {
+    "arm64-v8a":   "android_arm64-v8a",
+    "armeabi-v7a": "android_armeabi-v7a",
+    "x86":         "android_x86",
+    "x86_64":      "android_x64",
+}
 
 
 class ArchiveExtractor:
-    """Extract and organize files from Bass library zip archives."""
-    
+    """Extract and categorise library files from Bass zip archives."""
+
     def __init__(self):
         self.temp_dir = TEMP_DIR
-        
-    def extract_archive(self, archive_path: Path, library_name: str) -> Dict[str, List[Path]]:
-        """Extract archive and categorize files by platform.
-        
+
+    def extract_archive(
+        self, archive_path: Path, library_name: str, archive_type: str
+    ) -> Dict[str, Path]:
+        """Extract a zip archive and return files keyed by destination platform dir.
+
         Args:
-            archive_path: Path to zip file
-            library_name: Name of the library (for organizing extracts)
-            
+            archive_path:  Path to downloaded zip file.
+            library_name:  Internal library name (e.g. "bass", "bass_fx").
+            archive_type:  One of "win", "linux", "macos", "android", "ios".
+
         Returns:
-            Dict mapping platform names to lists of extracted library files
+            Dict mapping platform-dir name -> extracted source file path.
         """
-        extract_dir = self.temp_dir / f"{library_name}_extracted"
+        extract_dir = self.temp_dir / f"{library_name}_{archive_type}_extracted"
         extract_dir.mkdir(parents=True, exist_ok=True)
-        
+
         try:
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                zf.extractall(extract_dir)
         except zipfile.BadZipFile:
             raise RuntimeError(f"Corrupted zip file: {archive_path}")
-            
-        # Find and categorize library files
-        return self._categorize_files(extract_dir, library_name)
-        
-    def _categorize_files(self, extract_dir: Path, library_name: str) -> Dict[str, List[Path]]:
-        """Categorize extracted files by platform."""
-        platform_files = {}
-        
-        # Walk through extracted files
-        for root, dirs, files in os.walk(extract_dir):
-            root_path = Path(root)
-            
-            for file in files:
-                file_path = root_path / file
-                
-                # Determine platform and file type
-                platform = self._identify_platform(file_path, root_path, extract_dir)
-                if platform and self._is_library_file(file_path, library_name):
-                    if platform not in platform_files:
-                        platform_files[platform] = []
-                    platform_files[platform].append(file_path)
-                    
-        return platform_files
-        
-    def _identify_platform(self, file_path: Path, root_path: Path, extract_dir: Path) -> str:
-        """Identify platform from file extension and directory structure."""
-        suffix = file_path.suffix.lower()
-        
-        # Check for x64 directory structure (common in Bass archives)
-        rel_path = root_path.relative_to(extract_dir)
-        path_parts = [p.lower() for p in rel_path.parts]
-        
-        if suffix == '.dll':
-            # Windows - check for x64 directory
-            if 'x64' in path_parts or '64' in path_parts:
-                return 'win64'
+
+        dispatch = {
+            "win":     self._extract_win,
+            "linux":   self._extract_linux,
+            "macos":   self._extract_macos,
+            "android": self._extract_android,
+            "ios":     self._extract_ios,
+        }
+        extractor = dispatch.get(archive_type)
+        if extractor is None:
+            return {}
+        return extractor(extract_dir, library_name)
+
+    # ------------------------------------------------------------------
+    # Per-archive-type extraction helpers
+    # ------------------------------------------------------------------
+
+    def _extract_win(self, extract_dir: Path, libname: str) -> Dict[str, Path]:
+        """Windows zip: root-level DLL -> windows_x86, x64/ subdir -> windows_x64."""
+        dll_stem = WIN_DLL_STEMS.get(libname, libname)
+        target_name = f"{dll_stem}.dll"
+        results: Dict[str, Path] = {}
+
+        for fpath in extract_dir.rglob(target_name):
+            rel_parts = [p.lower() for p in fpath.relative_to(extract_dir).parts[:-1]]
+            if "x64" in rel_parts or "64" in rel_parts:
+                results["windows_x64"] = fpath
             else:
-                return 'win32'
-        elif suffix == '.so':
-            return 'linux'
-        elif suffix == '.dylib':
-            return 'macos'
-            
-        return None
-        
-    def _is_library_file(self, file_path: Path, library_name: str) -> bool:
-        """Check if file is a library file we want to keep."""
-        filename = file_path.name.lower()
-        
-        # Common library file patterns for Bass libraries
-        library_patterns = [
-            library_name.lower(),
-            library_name.lower().replace('_', ''),
-            f"lib{library_name.lower()}",
-            f"lib{library_name.lower().replace('_', '')}"
-        ]
-        
-        # Check if filename starts with any library pattern
-        for pattern in library_patterns:
-            if filename.startswith(pattern):
-                return True
-                
-        return False
-        
-    def cleanup_extraction(self, library_name: str):
-        """Clean up extraction directory for a specific library."""
-        extract_dir = self.temp_dir / f"{library_name}_extracted"
+                results["windows_x86"] = fpath
+
+        return results
+
+    def _extract_linux(self, extract_dir: Path, libname: str) -> Dict[str, Path]:
+        """Linux zip: libs/{arch}/lib{name}.so structure."""
+        return self._extract_shared_libs(extract_dir, libname, _LINUX_ARCH_MAP)
+
+    def _extract_android(self, extract_dir: Path, libname: str) -> Dict[str, Path]:
+        """Android zip: libs/{arch}/lib{name}.so structure (same layout as Linux)."""
+        return self._extract_shared_libs(extract_dir, libname, _ANDROID_ARCH_MAP)
+
+    def _extract_shared_libs(
+        self, extract_dir: Path, libname: str, arch_map: Dict[str, str]
+    ) -> Dict[str, Path]:
+        """Shared helper for Linux/Android: look for libs/{arch}/lib{name}.so.
+
+        Uses SO_STEMS to handle libraries whose archive filename differs from
+        the library key (e.g. bass_alac ships as libbassalac.so).
+        """
+        stem = SO_STEMS.get(libname, libname)
+        target_name = f"lib{stem}.so"
+        results: Dict[str, Path] = {}
+
+        for arch_key, dest_dir in arch_map.items():
+            candidate = extract_dir / "libs" / arch_key / target_name
+            if candidate.exists():
+                results[dest_dir] = candidate
+
+        return results
+
+    def _extract_macos(self, extract_dir: Path, libname: str) -> Dict[str, Path]:
+        """macOS zip: lib{name}.dylib in the archive root."""
+        stem = SO_STEMS.get(libname, libname)
+        target_name = f"lib{stem}.dylib"
+        for fpath in extract_dir.rglob(target_name):
+            return {"macos": fpath}
+        return {}
+
+    def _extract_ios(self, extract_dir: Path, libname: str) -> Dict[str, Path]:
+        """iOS zip: xcframework bundle structure.
+
+        Pattern (device):    {name}.xcframework/ios-arm64_armv7_armv7s/{name}.framework/{name}
+        Pattern (simulator): {name}.xcframework/ios-arm64*simulator/{name}.framework/{name}
+
+        The binary inside the framework has no file extension.  We copy it out
+        as {name}.so so Briefcase can recreate the .framework during packaging.
+        """
+        results: Dict[str, Path] = {}
+
+        for xcfw_dir in extract_dir.rglob("*.xcframework"):
+            if not xcfw_dir.is_dir():
+                continue
+
+            for variant_dir in xcfw_dir.iterdir():
+                if not variant_dir.is_dir():
+                    continue
+
+                is_simulator = "simulator" in variant_dir.name.lower()
+                dest_key = "iphonesimulator" if is_simulator else "iphoneos"
+
+                # Try the canonical name, the SO_STEMS override, then no-underscore variant
+                so_stem = SO_STEMS.get(libname, libname)
+                for candidate_name in dict.fromkeys((libname, so_stem, libname.replace("_", ""))):
+                    binary = variant_dir / f"{candidate_name}.framework" / candidate_name
+                    if binary.exists():
+                        results[dest_key] = binary
+                        break
+
+        return results
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    def cleanup_extraction(self, library_name: str, archive_type: str) -> None:
+        """Remove the extraction working directory for a library+archive_type pair."""
+        extract_dir = self.temp_dir / f"{library_name}_{archive_type}_extracted"
         if extract_dir.exists():
             shutil.rmtree(extract_dir)

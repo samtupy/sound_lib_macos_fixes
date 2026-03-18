@@ -4,3 +4,4 @@
 *.diff
 env
 docs/_build
+.claude/settings.local.json

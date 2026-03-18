@@ -4,13 +4,12 @@ from __future__ import absolute_import
 import ctypes
 import os
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
-bass_alac_module = libloader.load_library('bass_alac', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
-
-pybass.BASS_PluginLoad(libloader.find_library_path('bass_alac', x86_path=x86_path, x64_path=x64_path), 0)
+_bass_alac_lib   = find_library('bass_alac')
+bass_alac_module = _bass_alac_lib.module
+func_type        = _bass_alac_lib.func_type
+pybass.BASS_PluginLoad(_bass_alac_lib.path, 0)
 
 BASS_TAG_MP4 = 7
 BASS_CTYPE_STREAM_ALAC = 0x10e00

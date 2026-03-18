@@ -14,16 +14,14 @@ BASSWASAPI requires a soundcard with WASAPI drivers.
 import sys, ctypes, platform
 
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
-
+from .find_library import find_library
 
 HSTREAM = pybass.HSTREAM
 BASS_FILEPROCS = pybass.BASS_FILEPROCS
 
-
-basswasapi_module = libloader.load_library('basswasapi', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
+_basswasapi_lib    = find_library('basswasapi')
+basswasapi_module  = _basswasapi_lib.module
+func_type          = _basswasapi_lib.func_type
 
 # Additional error codes returned by BASS_ErrorGetCode
 BASS_ERROR_WASAPI = 5000

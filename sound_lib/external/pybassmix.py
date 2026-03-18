@@ -23,11 +23,11 @@ DOWNLOADPROC = pybass.DOWNLOADPROC
 SYNCPROC = pybass.SYNCPROC
 BASS_FILEPROCS = pybass.BASS_FILEPROCS
 
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
-bassmix_module = libloader.load_library('bassmix', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
+_bassmix_lib   = find_library('bassmix')
+bassmix_module = _bassmix_lib.module
+func_type      = _bassmix_lib.func_type
 	
 # additional BASS_SetConfig option
 BASS_CONFIG_MIXER_FILTER = 0x10600

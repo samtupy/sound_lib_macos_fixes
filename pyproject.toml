@@ -26,8 +26,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "libloader",
-    "platform_utils==1.6.2",
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.0",
     "lxml>=4.9.0",
@@ -43,7 +41,21 @@ where = ["."]
 include = ["sound_lib*"]
 
 [tool.setuptools.package-data]
-sound_lib = ["lib/x86/*", "lib/x64/*"]
+sound_lib = [
+    "lib/windows_x86/*",
+    "lib/windows_x64/*",
+    "lib/linux_x64/*",
+    "lib/linux_x86/*",
+    "lib/linux_aarch64/*",
+    "lib/linux_armhf/*",
+    "lib/macos/*",
+    "lib/android_arm64-v8a/*",
+    "lib/android_armeabi-v7a/*",
+    "lib/android_x86/*",
+    "lib/android_x64/*",
+    "lib/iphoneos/*",
+    "lib/iphonesimulator/*",
+]
 
 [dependency-groups]
 dev = [

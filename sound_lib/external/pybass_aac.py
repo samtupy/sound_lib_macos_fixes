@@ -14,13 +14,12 @@ of Advanced Audio Coding and MPEG-4 streams (http://www.maresweb.de).
 
 import os, sys, ctypes
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
-bass_aac_module = libloader.load_library('bass_aac', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
-#Register the plugin with the Bass plugin system.
-pybass.BASS_PluginLoad(libloader.find_library_path('bass_aac', x86_path=x86_path, x64_path=x64_path), 0)
+_bass_aac_lib   = find_library('bass_aac')
+bass_aac_module = _bass_aac_lib.module
+func_type       = _bass_aac_lib.func_type
+pybass.BASS_PluginLoad(_bass_aac_lib.path, 0)
 
 QWORD = pybass.QWORD
 HSTREAM = pybass.HSTREAM

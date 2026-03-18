@@ -57,12 +57,11 @@ import ctypes
 import platform
 import sys
 
-import libloader
+from .find_library import find_library
 
-from .paths import x64_path, x86_path
-
-bass_module = libloader.load_library('bass', x86_path=x86_path, x64_path=x64_path, mode=ctypes.RTLD_GLOBAL)
-func_type = libloader.get_functype()
+_bass_lib  = find_library('bass', rtld_global=True)
+bass_module = _bass_lib.module
+func_type   = _bass_lib.func_type
 
 
 QWORD = ctypes.c_int64

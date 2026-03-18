@@ -27,10 +27,13 @@ Supported tags:
 '''
 
 import sys, ctypes, platform
-from .paths import x86_path, x64_path
-import libloader
-tags_module = libloader.load_library('tags', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()# Current version. Just increments each release.
+from .find_library import find_library
+
+_tags_lib   = find_library('tags')
+tags_module = _tags_lib.module
+func_type   = _tags_lib.func_type
+
+# Current version. Just increments each release.
 
 TAGS_VERSION = 17
 

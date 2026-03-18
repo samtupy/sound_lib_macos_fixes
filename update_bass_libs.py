@@ -45,8 +45,8 @@ def main():
     parser.add_argument(
         '--platforms', '-p',
         nargs='+',
-        choices=['win32', 'win64', 'linux', 'macos'],
-        help='Limit updates to specified platforms'
+        choices=['win', 'linux', 'macos', 'android', 'ios'],
+        help='Limit updates to specified archive types'
     )
     
     parser.add_argument(
@@ -59,8 +59,8 @@ def main():
     
     if args.list_libraries:
         print("Supported Bass libraries:")
-        for lib_key, (display_name, _, _) in BASS_LIBRARIES.items():
-            print(f"  {lib_key:<12} - {display_name}")
+        for lib_key, lib_def in BASS_LIBRARIES.items():
+            print(f"  {lib_key:<12} - {lib_def.display_name}")
         return 0
         
     try:
@@ -88,7 +88,7 @@ def main():
                 print(f"Would update {args.library}: {old_version or 'not installed'} → {new_version}")
                 return 0
                 
-            success = updater.update_library(args.library, new_version, args.platforms)
+            success = updater.update_library(args.library, new_version, args.platforms or None)
             return 0 if success else 1
             
         else:

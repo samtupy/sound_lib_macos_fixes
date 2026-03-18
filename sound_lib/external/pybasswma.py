@@ -24,19 +24,18 @@ can also be installed separately (WMFDIST.EXE is available from the BASS website
 
 import os, sys, ctypes
 from . import pybass
-from .paths import x86_path, x64_path
-import libloader
+from .find_library import find_library
 
 QWORD = pybass.QWORD
 HSTREAM = pybass.HSTREAM
 BASS_FILEPROCS = pybass.BASS_FILEPROCS
 
-HWMENCODE = ctypes.c_ulong# WMA encoding handle
+HWMENCODE = ctypes.c_ulong  # WMA encoding handle
 
-basswma_module = libloader.load_library('basswma', x86_path=x86_path, x64_path=x64_path)
-func_type = libloader.get_functype()
-#Register the plugin with the Bass plugin system.
-pybass.BASS_PluginLoad(libloader.find_library_path('basswma', x86_path=x86_path, x64_path=x64_path), 0)
+_basswma_lib   = find_library('basswma')
+basswma_module = _basswma_lib.module
+func_type      = _basswma_lib.func_type
+pybass.BASS_PluginLoad(_basswma_lib.path, 0)
 
 
 # Additional error codes returned by BASS_ErrorGetCode
